@@ -120,6 +120,31 @@ def load_synthetic():
     print("[INFO] Synthetic: ", X_train.shape, X_test.shape)
     return X_train, X_test, y_train, y_test
 
+def load_synthetic_df():
+    url_train = 'https://archive.ics.uci.edu/ml/machine-learning-databases/madelon/MADELON/madelon_train.data'
+    url_test = 'https://archive.ics.uci.edu/ml/machine-learning-databases/madelon/MADELON/madelon_test.data'
+
+    d_train = urllib.request.urlopen(url_train)
+    d_test = urllib.request.urlopen(url_test)
+
+    l = []
+    for line in d_train:
+        row = np.array(list(str(line).split(' ')))
+        rows = np.array_split(row, 32)
+        l.append(rows)
+    df_train = pd.DataFrame(l)
+
+    l = []
+    for line in d_test:
+        row = np.array(list(str(line).split(' ')))
+        rows = np.array_split(row, 32)
+        l.append(rows)
+    df_test = pd.DataFrame(l)
+
+    df_train_labels = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/madelon/MADELON/madelon_train.labels')
+    
+    return df_train, df_train_labels, df_test
+
 def prepare_dataset(name):
     if name == "higgs":
         return load_higgs_df()
@@ -135,6 +160,8 @@ def prepare_dataset(name):
         print("CURRENTLY BROKEN")
         exit(0)
         return load_synthetic()
+    elif name == "madelon":
+        return load_synthetic_df()
     else:
         print("[ERROR] Invalid input name.")
         exit(0)
