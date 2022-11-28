@@ -120,6 +120,15 @@ def load_synthetic():
     print("[INFO] Synthetic: ", X_train.shape, X_test.shape)
     return X_train, X_test, y_train, y_test
 
+def load_synthetic_df(num_rows, num_cols, sparsity, test_size):
+   X, y = datasets.make_classification(n_samples=num_rows, n_features=num_cols, n_redundant=0, n_informative=num_cols, n_repeated=0, random_state=7)
+   if sparsity < 1.0:
+      X = np.array([[np.nan if rng.uniform(0, 1) < sparsity else x for x in x_row] for x_row in X])
+
+   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=7)
+
+   return pd.DataFrame(X_train), pd.DataFrame(X_test), pd.DataFrame(y_train), pd.DataFrame(y_test)
+
 def prepare_dataset(name):
     if name == "higgs":
         return load_higgs_df()
@@ -135,6 +144,8 @@ def prepare_dataset(name):
         print("CURRENTLY BROKEN")
         exit(0)
         return load_synthetic()
+    elif name == "synthetic_df":
+        return load_synthetic_df(10000000, 100, 0.0, 0.25)
     else:
         print("[ERROR] Invalid input name.")
         exit(0)
