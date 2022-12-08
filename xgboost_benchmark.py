@@ -169,12 +169,15 @@ print(prepare_dataset("synthetic").y_train)
 
 print(prepare_dataset("airline").X_train.shape)
 
-def benchmark(dtrain, dtest, num_round, obj, plot, errfloor, errceil):
+def benchmark(task, dtrain, dtest, num_round, obj, plot, errfloor, errceil):
     param = {}
     param['objective'] = obj
-    param['eval_metric'] = 'error'
+    if task == 'reg':
+        param['eval_metric'] = 'rmse'
+    elif task == 'cla':
+        param['eval_metric'] = 'error'
     param['tree_method'] = 'gpu_hist'
-    param['silent'] = 1
+    # param['silent'] = 1
 
     print("Training with GPU ...")
     tmp = time.time()
@@ -183,6 +186,10 @@ def benchmark(dtrain, dtest, num_round, obj, plot, errfloor, errceil):
             evals_result=gpu_res)
     gpu_time = time.time() - tmp
     print("GPU Training Time: %s seconds" % (str(gpu_time)))
+    if task == 'reg':
+        print("GPU RMSE: ", sum(gpu_res['test'][param['eval_metric']]) / len(gpu_res['test'][param['eval_metric']]))
+    elif task == 'cla':
+        print("GPU Accuracy: ", 1 - sum(gpu_res['test'][param['eval_metric']]) / len(gpu_res['test'][param['eval_metric']]))
 
     print("Training with CPU ...")
     param['tree_method'] = 'hist'
@@ -192,6 +199,10 @@ def benchmark(dtrain, dtest, num_round, obj, plot, errfloor, errceil):
             evals_result=cpu_res)
     cpu_time = time.time() - tmp
     print("CPU Training Time: %s seconds" % (str(cpu_time)))
+    if task == 'reg':
+        print("CPU RMSE: ", sum(cpu_res['test'][param['eval_metric']]) / len(cpu_res['test'][param['eval_metric']]))
+    elif task == 'cla':
+        print("CPU Accuracy: ", 1 - sum(cpu_res['test'][param['eval_metric']]) / len(cpu_res['test'][param['eval_metric']]))
 
     if plot:
         import matplotlib.pyplot as plt
@@ -206,15 +217,15 @@ def benchmark(dtrain, dtest, num_round, obj, plot, errfloor, errceil):
         plt.ylabel('Test error')
         plt.axhline(y=min_error, color='r', linestyle='dashed')
         plt.margins(x=0)
-        plt.ylim((errfloor, errceil))
+        # plt.ylim((errfloor, errceil))
         plt.show()
 
 # prepare data
-# data = prepare_dataset("synthetic")
+data = prepare_dataset("synthetic")
 
 # transform data
 dtrain = xgb.DMatrix(data=data.X_train, label=data.y_train)
 dtest = xgb.DMatrix(data=data.X_test, label=data.y_test)
 
 # synthetic
-benchmark(dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:squarederror', plot=True, errfloor=0.005, errceil=0.5)
+benchmark(task='reg', dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:squarederror', plot=True, errfloor=0.005, errceil=0.5)
