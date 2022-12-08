@@ -167,3 +167,54 @@ print(prepare_dataset("synthetic").y_train)
 # dtrain = xgb.DMatrix(data=temp.X_train, label=temp.y_train)
 
 
+print(prepare_dataset("airline").X_train.shape)
+
+def benchmark(dtrain, dtest, num_round, obj, plot, errfloor, errceil):
+    param = {}
+    param['objective'] = obj
+    param['eval_metric'] = 'error'
+    param['tree_method'] = 'gpu_hist'
+    param['silent'] = 1
+
+    print("Training with GPU ...")
+    tmp = time.time()
+    gpu_res = {}
+    xgb.train(param, dtrain, num_round, evals=[(dtest, "test")], 
+            evals_result=gpu_res)
+    gpu_time = time.time() - tmp
+    print("GPU Training Time: %s seconds" % (str(gpu_time)))
+
+    print("Training with CPU ...")
+    param['tree_method'] = 'hist'
+    tmp = time.time()
+    cpu_res = {}
+    xgb.train(param, dtrain, num_round, evals=[(dtest, "test")], 
+            evals_result=cpu_res)
+    cpu_time = time.time() - tmp
+    print("CPU Training Time: %s seconds" % (str(cpu_time)))
+
+    if plot:
+        import matplotlib.pyplot as plt
+        min_error = min(min(gpu_res["test"][param['eval_metric']]), 
+                        min(cpu_res["test"][param['eval_metric']]))
+        gpu_iteration_time = [x / (num_round * 1.0) * gpu_time for x in range(0, num_round)]
+        cpu_iteration_time = [x / (num_round * 1.0) * cpu_time for x in range(0, num_round)]
+        plt.plot(gpu_iteration_time, gpu_res['test'][param['eval_metric']], label=torch.cuda.get_device_name())
+        plt.plot(cpu_iteration_time, cpu_res['test'][param['eval_metric']], label=cpuinfo.get_cpu_info()['brand_raw'])
+        plt.legend()
+        plt.xlabel('Time (s)')
+        plt.ylabel('Test error')
+        plt.axhline(y=min_error, color='r', linestyle='dashed')
+        plt.margins(x=0)
+        plt.ylim((errfloor, errceil))
+        plt.show()
+
+# prepare data
+# data = prepare_dataset("synthetic")
+
+# transform data
+dtrain = xgb.DMatrix(data=data.X_train, label=data.y_train)
+dtest = xgb.DMatrix(data=data.X_test, label=data.y_test)
+
+# synthetic
+benchmark(dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:squarederror', plot=True, errfloor=0.005, errceil=0.5)
