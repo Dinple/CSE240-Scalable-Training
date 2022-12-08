@@ -12,10 +12,10 @@ from sklearn.model_selection import train_test_split
 from urllib.request import urlretrieve
 import numpy as np
 import platform
-import torch
-import cpuinfo
-print(cpuinfo.get_cpu_info()['brand_raw'])
-print(torch.cuda.get_device_name())
+#import torch
+#import cpuinfo
+#print(cpuinfo.get_cpu_info()['brand_raw'])
+#print(torch.cuda.get_device_name())
 
 class Data:  # pylint: disable=too-few-public-methods,too-many-arguments
     def __init__(self, X_train, X_test, y_train, y_test, learning_task, qid_train=None,
@@ -71,17 +71,20 @@ def load_covertype():
     """
     Load cover type into dataframe
     """
+    if os.path.exists(os.path.join(os.getcwd(), "dataset/conv_type/cov_type.pkl")):
+        return pickle.load(open(os.path.join(os.getcwd(), "dataset/conv_type/cov_type.pkl"), "rb"))  
     nrows = 581 * 1000
     X, y = datasets.fetch_covtype(return_X_y=True)
     if nrows is not None:
         X = X[0:nrows]
         y = y[0:nrows]
-
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=77,
                                                         test_size=0.2,
                                                         )
+    data = Data(X_train, X_test, y_train, y_test, LearningTask.CLASSIFICATION) 
+    pickle.dump(data, open("dataset/conv_type/cov_type.pkl", "wb"), protocol=4) 
     print("[INFO] Cover Type: ", X.shape)
-    return  X_train, X_test, y_train, y_test
+    return data
 
 def load_yearmsd():
     """
@@ -93,41 +96,18 @@ def load_yearmsd():
     print(df.head())
     return df
 
-def load_synthetic():
-    """
-    Load Synthetic into dataframe
-    """
-    nrows = 10 * 10 ** 6
-    x_df = pd.DataFrame()
-    y_df = pd.DataFrame()
+def load_synthetic(num_rows, num_cols, sparsity, test_size):
+    rng = np.random.RandomState(1994)
+    if os.path.exists(os.path.join(os.getcwd(), "dataset/synthetic/synthetic.pkl")):
+        return pickle.load(open(os.path.join(os.getcwd(), "dataset/synthetic/synthetic.pkl"), "rb")) 
+    X, y = datasets.make_classification(n_samples=num_rows, n_features=num_cols, n_redundant=0, n_informative=num_cols, n_repeated=0, random_state=7)
+    if sparsity < 1.0:
+        X = np.array([[np.nan if rng.uniform(0, 1) < sparsity else x for x in x_row] for x_row in X])
 
-    X_train, y_train = datasets.load_svmlight_file(os.path.join(os.getcwd(), "dataset/synthetic/epsilon_normalized.bz2"), dtype=np.float32)
-    X_test, y_test = datasets.load_svmlight_file(os.path.join(os.getcwd(), "dataset/synthetic/epsilon_normalized.t.bz2"), dtype=np.float32)
-
-    X_train = X_train.toarray()
-    X_test = X_test.toarray()
-    y_train[y_train <= 0] = 0
-    y_test[y_test <= 0] = 0
-
-    X_train = np.vstack((X_train, X_test))
-    y_train = np.append(y_train, y_test)
-    X_train = X_train[:nrows]
-    y_train = y_train[:nrows]
-    X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, random_state=77,
-                                                        test_size=0.2,
-                                                        )
-
-    print("[INFO] Synthetic: ", X_train.shape, X_test.shape)
-    return X_train, X_test, y_train, y_test
-
-def load_synthetic_df(num_rows, num_cols, sparsity, test_size):
-   X, y = datasets.make_classification(n_samples=num_rows, n_features=num_cols, n_redundant=0, n_informative=num_cols, n_repeated=0, random_state=7)
-   if sparsity < 1.0:
-      X = np.array([[np.nan if rng.uniform(0, 1) < sparsity else x for x in x_row] for x_row in X])
-
-   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=7)
-
-   return pd.DataFrame(X_train), pd.DataFrame(X_test), pd.DataFrame(y_train), pd.DataFrame(y_test)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=7)
+    data = Data(X_train, X_test, y_train, y_test, LearningTask.CLASSIFICATION)
+    pickle.dump(data, open("dataset/synthetic/synthetic.pkl", "wb"), protocol=4)
+    return data
 
 def prepare_dataset(name):
     if name == "higgs":
@@ -141,11 +121,7 @@ def prepare_dataset(name):
     elif name == "yearmsd":
         return load_yearmsd()
     elif name == "synthetic":
-        print("CURRENTLY BROKEN")
-        exit(0)
-        return load_synthetic()
-    elif name == "synthetic_df":
-        return load_synthetic_df(10000000, 100, 0.0, 0.25)
+        return load_synthetic(10000000, 100, 0.0, 0.25)
     else:
         print("[ERROR] Invalid input name.")
         exit(0)
