@@ -36,12 +36,24 @@ class LearningTask(Enum):
 
 def load_higgs_df():
     df = pd.DataFrame()
+    if os.path.exists(os.path.join(os.getcwd(), "dataset/higgs/higgs.pkl")):
+        return pickle.load(open(os.path.join(os.getcwd(), "dataset/higgs/higgs.pkl"), "rb"))
     cols = ['boson','lepton_pT','lepton_eta','lepton_phi','missing_energy_magnitude','missing_energy_phi','jet_1_pt','jet_1_eta','jet_1_phi','jet_1_b-tag','jet_2_pt','jet_2_eta','jet_2_phi','jet_2_b-tag','jet_3_pt','jet_3_eta','jet_3_phi','jet_3_b-tag','jet_4_pt','jet_4_eta','jet_4_phi','jet_4_b-tag','m_jj','m_jjj','m_lv','m_jlv','m_bb','m_wbb','m_wwbb']
     for chunk in pd.read_csv(os.path.join(os.getcwd(), "dataset/higgs/HIGGS.csv"), names=cols, iterator=True, chunksize=10 ** 6):
         df = pd.concat([df, chunk], ignore_index=True)
     print("[INFO] HIGGS: ", chunk.shape)
+    y = df.iloc[:, 0]
+    print(y.shape)
+    X = df.iloc[:, 1:]
+    print(X.shape)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=77,
+                                                        test_size=0.2,
+                                                        )
+    data = Data(X_train, X_test, y_train, y_test, LearningTask.CLASSIFICATION) 
+    pickle.dump(data, open("dataset/higgs/higgs.pkl", "wb"), protocol=4)
+
     print(chunk.head())
-    return df
+    return data
 
 def load_airline_df():
     """
@@ -62,27 +74,39 @@ def load_bosch():
     Load bosch into dataframe
     """
     df = pd.DataFrame()
+    if os.path.exists(os.path.join(os.getcwd(), "dataset/bosch/bosch.pkl")):
+        return pickle.load(open(os.path.join(os.getcwd(), "dataset/bosch/bosch.pkl"), "rb"))
     df = pd.read_csv(os.path.join(os.getcwd(), "dataset/bosch/train_numeric.csv.zip"), index_col=0, compression='zip', dtype=np.float32,nrows=10**6)
     print("[INFO] bosch: ", df.shape)
+    y = df.iloc[:, -1]
+    print(y.shape)
+    X = df.iloc[:, 0:-1]
+    print(X.shape)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=77,
+                                                        test_size=0.2,
+                                                        )
+    data = Data(X_train, X_test, y_train, y_test, LearningTask.CLASSIFICATION) 
+    pickle.dump(data, open("dataset/bosch/bosch.pkl", "wb"), protocol=4)
     print(df.head())
-    return df
+    return data
 
 def load_covertype():
     """
     Load cover type into dataframe
     """
-    if os.path.exists(os.path.join(os.getcwd(), "dataset/conv_type/cov_type.pkl")):
-        return pickle.load(open(os.path.join(os.getcwd(), "dataset/conv_type/cov_type.pkl"), "rb"))  
+    if os.path.exists(os.path.join(os.getcwd(), "dataset/cov_type/cov_type.pkl")):
+        return pickle.load(open(os.path.join(os.getcwd(), "dataset/cov_type/cov_type.pkl"), "rb"))  
     nrows = 581 * 1000
     X, y = datasets.fetch_covtype(return_X_y=True)
     if nrows is not None:
         X = X[0:nrows]
         y = y[0:nrows]
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=77,
                                                         test_size=0.2,
                                                         )
     data = Data(X_train, X_test, y_train, y_test, LearningTask.CLASSIFICATION) 
-    pickle.dump(data, open("dataset/conv_type/cov_type.pkl", "wb"), protocol=4) 
+    pickle.dump(data, open("dataset/cov_type/cov_type.pkl", "wb"), protocol=4) 
     print("[INFO] Cover Type: ", X.shape)
     return data
 
@@ -91,16 +115,28 @@ def load_yearmsd():
     Load YearPredictionMSD into dataframe
     """
     df = pd.DataFrame()
-    df = pd.read_csv(os.path.join(os.getcwd(), "dataset/yearmsd/YearPredictionMSD.txt.zip"), index_col=0, compression='zip', dtype=np.float32, nrows=515 * 1000)
+    if os.path.exists(os.path.join(os.getcwd(), "dataset/yearmsd/yearmsd.pkl")):
+        return pickle.load(open(os.path.join(os.getcwd(), "dataset/yearmsd/yearmsd.pkl"), "rb"))
+    df = pd.read_csv(os.path.join(os.getcwd(), "dataset/yearmsd/YearPredictionMSD.txt.zip"), compression='zip', header=None, nrows=515 * 1000)
     print("[INFO] YearPredictionMSD: ", df.shape)
+    y = df.iloc[:, 0]
+    print(y.shape)
+    X = df.iloc[:, 1:]
+    print(X.shape)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=77,
+                                                        test_size=0.2,
+                                                        )
+    data = Data(X_train, X_test, y_train, y_test, LearningTask.REGRESSION) 
+    pickle.dump(data, open("dataset/yearmsd/yearmsd.pkl", "wb"), protocol=4)
     print(df.head())
-    return df
+    return data
 
 def load_synthetic(num_rows, num_cols, sparsity, test_size):
-    rng = np.random.RandomState(1994)
+    rng = np.random.RandomState(42)
     if os.path.exists(os.path.join(os.getcwd(), "dataset/synthetic/synthetic.pkl")):
         return pickle.load(open(os.path.join(os.getcwd(), "dataset/synthetic/synthetic.pkl"), "rb")) 
-    X, y = datasets.make_classification(n_samples=num_rows, n_features=num_cols, n_redundant=0, n_informative=num_cols, n_repeated=0, random_state=7)
+    X, y = datasets.make_regression(n_samples=num_rows, n_features=num_cols, n_informative=num_cols, random_state=7)
+
     if sparsity < 1.0:
         X = np.array([[np.nan if rng.uniform(0, 1) < sparsity else x for x in x_row] for x_row in X])
 
@@ -115,7 +151,7 @@ def prepare_dataset(name):
     elif name == "airline":
         return load_airline_df()
     elif name == "bosch":
-        return load_bosch
+        return load_bosch()
     elif name == "covertype":
         return load_covertype()
     elif name == "yearmsd":
@@ -126,4 +162,8 @@ def prepare_dataset(name):
         print("[ERROR] Invalid input name.")
         exit(0)
 
-print(prepare_dataset("airline").X_train.shape)
+print(prepare_dataset("synthetic").y_train)
+# temp = prepare_dataset("bosch")
+# dtrain = xgb.DMatrix(data=temp.X_train, label=temp.y_train)
+
+
