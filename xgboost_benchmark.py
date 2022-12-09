@@ -12,10 +12,11 @@ from sklearn.model_selection import train_test_split
 from urllib.request import urlretrieve
 import numpy as np
 import platform
-#import torch
-#import cpuinfo
-#print(cpuinfo.get_cpu_info()['brand_raw'])
-#print(torch.cuda.get_device_name())
+import torch
+import cpuinfo
+# print(cpuinfo.get_cpu_info()['brand_raw'])
+# print(torch.cuda.get_device_name())
+from sklearn.metrics import accuracy_score
 
 class Data:  # pylint: disable=too-few-public-methods,too-many-arguments
     def __init__(self, X_train, X_test, y_train, y_test, learning_task, qid_train=None,
@@ -271,7 +272,9 @@ def benchmark_nonmatrix(task, obj, num_round, X_train, y_train, X_test, y_test):
 # data = prepare_dataset("synthetic")
 # data = prepare_dataset("airline")
 # data = prepare_dataset("covertype")
-data = prepare_dataset("bosch")
+# data = prepare_dataset("bosch")
+# data = prepare_dataset("yearmsd")
+data = prepare_dataset("higgs")
 
 # transform data: synthetic, covertype, yearmsd
 dtrain = xgb.DMatrix(data=data.X_train, label=data.y_train)
@@ -281,9 +284,6 @@ dtest = xgb.DMatrix(data=data.X_test, label=data.y_test)
 # benchmark(task='reg', dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:squarederror', plot=True)
 # synthetic w/o dmatrix
 # benchmark_nonmatrix(task='reg', obj='reg:squarederror', num_round=500, X_train=data.X_train, y_train=data.y_train, X_test=data.X_test, y_test=data.y_test)
-
-# airline
-# benchmark(task='reg', dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:squarederror', plot=True)
 
 # cover type
 # benchmark(task='mcla', dtrain=dtrain, dtest=dtest, num_round=500, obj='multi:softmax', plot=True)
@@ -297,8 +297,14 @@ dtest = xgb.DMatrix(data=data.X_test, label=data.y_test)
 
 # airline
 # benchmark(task='cla', dtrain=dtrain, dtest=dtest, num_round=500, obj='binary:logistic', plot=True)
+# benchmark_nonmatrix(task='cla', obj='binary:logistic', num_round=500, X_train=data.X_train, y_train=data.y_train, X_test=data.X_test, y_test=data.y_test)
 
 # bosch
 # benchmark(task='cla', dtrain=dtrain, dtest=dtest, num_round=500, obj='binary:logistic', plot=True)
-# bosch w/o dmatrix
+# benchmark_nonmatrix(task='cla', obj='binary:logistic', num_round=500, X_train=data.X_train, y_train=data.y_train, X_test=data.X_test, y_test=data.y_test)
+
+# higg
+# benchmark(task='cla', dtrain=dtrain, dtest=dtest, num_round=500, obj='binary:logistic', plot=True)
 benchmark_nonmatrix(task='cla', obj='binary:logistic', num_round=500, X_train=data.X_train, y_train=data.y_train, X_test=data.X_test, y_test=data.y_test)
+
+
