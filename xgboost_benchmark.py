@@ -169,13 +169,17 @@ print(prepare_dataset("synthetic").y_train)
 
 print(prepare_dataset("airline").X_train.shape)
 
-def benchmark(task, dtrain, dtest, num_round, obj, plot, errfloor, errceil):
+def benchmark(task, dtrain, dtest, num_round, obj, plot):
     param = {}
     param['objective'] = obj
     if task == 'reg':
         param['eval_metric'] = 'rmse'
     elif task == 'cla':
         param['eval_metric'] = 'error'
+    elif task == 'mcla':
+        param['eval_metric'] = 'mlogloss'
+        param['num_class'] = 7
+
     param['tree_method'] = 'gpu_hist'
     # param['silent'] = 1
 
@@ -187,22 +191,22 @@ def benchmark(task, dtrain, dtest, num_round, obj, plot, errfloor, errceil):
     gpu_time = time.time() - tmp
     print("GPU Training Time: %s seconds" % (str(gpu_time)))
     if task == 'reg':
-        print("GPU RMSE: ", sum(gpu_res['test'][param['eval_metric']]) / len(gpu_res['test'][param['eval_metric']]))
-    elif task == 'cla':
-        print("GPU Accuracy: ", 1 - sum(gpu_res['test'][param['eval_metric']]) / len(gpu_res['test'][param['eval_metric']]))
+        print("GPU RMSE: ", gpu_res['test'][param['eval_metric']][-1])
+    elif task == 'cla' or task == 'mcla':
+        print("GPU Accuracy: ", 1 - gpu_res['test'][param['eval_metric']][-1])
 
     print("Training with CPU ...")
     param['tree_method'] = 'hist'
     tmp = time.time()
     cpu_res = {}
     xgb.train(param, dtrain, num_round, evals=[(dtest, "test")], 
-            evals_result=cpu_res)
+                evals_result=cpu_res)
     cpu_time = time.time() - tmp
     print("CPU Training Time: %s seconds" % (str(cpu_time)))
     if task == 'reg':
-        print("CPU RMSE: ", sum(cpu_res['test'][param['eval_metric']]) / len(cpu_res['test'][param['eval_metric']]))
-    elif task == 'cla':
-        print("CPU Accuracy: ", 1 - sum(cpu_res['test'][param['eval_metric']]) / len(cpu_res['test'][param['eval_metric']]))
+        print("CPU RMSE: ", gpu_res['test'][param['eval_metric']][-1])
+    elif task == 'cla' or task == 'mcla':
+        print("CPU Accuracy: ", 1 - gpu_res['test'][param['eval_metric']][-1])
 
     if plot:
         import matplotlib.pyplot as plt
@@ -220,12 +224,81 @@ def benchmark(task, dtrain, dtest, num_round, obj, plot, errfloor, errceil):
         # plt.ylim((errfloor, errceil))
         plt.show()
 
-# prepare data
-data = prepare_dataset("synthetic")
+# synthetic non-dmatrix version
+def benchmark_nonmatrix(task, obj, num_round, X_train, y_train, X_test, y_test):
+    eval_set = [(X_train, y_train), (X_test, y_test)]
+    # GPU
+    if task == 'reg':
+        xgbr = xgb.XGBRegressor(tree_method='gpu_hist', objective=obj, n_estimators=num_round, eval_metric="rmse")
+    elif task == 'mcla':
+        xgbr = xgb.XGBClassifier(tree_method='gpu_hist', objective=obj, n_estimators=num_round, eval_metric="mlogloss")
+    else:
+        xgbr = xgb.XGBClassifier(tree_method='gpu_hist', objective=obj, n_estimators=num_round, eval_metric="error")
+    print("Training with GPU ...")
+    tmp = time.time()
+    xgbr.fit(X_train, y_train, eval_set = eval_set, verbose = True)
+    y_pred = xgbr.predict(X_test)
+    gpu_time = time.time() - tmp
+    print("GPU Training Time: %s seconds" % (str(gpu_time)))
+    if task == 'reg':
+        gpu_mse = mean_squared_error(y_test, y_pred)
+        gpu_rmse = math.sqrt(gpu_mse)
+        print("GPU RMSE: ", gpu_rmse)
+    else:
+        print("GPU Accuracy: ", accuracy_score(y_test, y_pred))
 
-# transform data
+    # CPU
+    if task == 'reg':
+        xgbr = xgb.XGBRegressor(tree_method='hist', objective=obj, n_estimators=num_round, eval_metric="rmse")
+    elif task == 'mcla':
+        xgbr = xgb.XGBClassifier(tree_method='hist', objective=obj, n_estimators=num_round, eval_metric="mlogloss")
+    else:
+        xgbr = xgb.XGBClassifier(tree_method='hist', objective=obj, n_estimators=num_round, eval_metric="error")
+    print("Training with CPU ...")
+    tmp = time.time()
+    xgbr.fit(X_train, y_train, eval_set = eval_set, verbose = True)
+    y_pred = xgbr.predict(X_test)
+    cpu_time = time.time() - tmp
+    print("CPU Training Time: %s seconds" % (str(cpu_time)))
+    if task == 'reg':
+        cpu_mse = mean_squared_error(y_test, y_pred)
+        cpu_rmse = math.sqrt(cpu_mse)
+        print("CPU RMSE: ", cpu_rmse)
+    else:
+        print("CPU Accuracy: ", accuracy_score(y_test, y_pred))
+
+# prepare data
+# data = prepare_dataset("synthetic")
+# data = prepare_dataset("airline")
+# data = prepare_dataset("covertype")
+data = prepare_dataset("bosch")
+
+# transform data: synthetic, covertype, yearmsd
 dtrain = xgb.DMatrix(data=data.X_train, label=data.y_train)
 dtest = xgb.DMatrix(data=data.X_test, label=data.y_test)
 
 # synthetic
-benchmark(task='reg', dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:squarederror', plot=True, errfloor=0.005, errceil=0.5)
+# benchmark(task='reg', dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:squarederror', plot=True)
+# synthetic w/o dmatrix
+# benchmark_nonmatrix(task='reg', obj='reg:squarederror', num_round=500, X_train=data.X_train, y_train=data.y_train, X_test=data.X_test, y_test=data.y_test)
+
+# airline
+# benchmark(task='reg', dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:squarederror', plot=True)
+
+# cover type
+# benchmark(task='mcla', dtrain=dtrain, dtest=dtest, num_round=500, obj='multi:softmax', plot=True)
+# cover type w/o dmatrix
+# benchmark_nonmatrix(task='mcla', obj='multi:softmax', num_round=500, X_train=data.X_train, y_train=data.y_train, X_test=data.X_test, y_test=data.y_test)
+
+# yearmsd
+# benchmark(task='reg', dtrain=dtrain, dtest=dtest, num_round=500, obj='reg:linear', plot=True)
+# yearmsd w/o dmatrix
+# benchmark_nonmatrix(task='reg', obj='reg:linear', num_round=500, X_train=data.X_train, y_train=data.y_train, X_test=data.X_test, y_test=data.y_test)
+
+# airline
+# benchmark(task='cla', dtrain=dtrain, dtest=dtest, num_round=500, obj='binary:logistic', plot=True)
+
+# bosch
+# benchmark(task='cla', dtrain=dtrain, dtest=dtest, num_round=500, obj='binary:logistic', plot=True)
+# bosch w/o dmatrix
+benchmark_nonmatrix(task='cla', obj='binary:logistic', num_round=500, X_train=data.X_train, y_train=data.y_train, X_test=data.X_test, y_test=data.y_test)
